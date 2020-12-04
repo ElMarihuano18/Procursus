@@ -3,18 +3,19 @@ $(error Use the main Makefile)
 endif
 
 SUBPROJECTS        += dimentio
-DIMENTIO_VERSION   := 1.0.2
+# I'm not going to bump the version any higher than 1.0.3. Just change commit date/short hash.
+DIMENTIO_VERSION   := 1.0.3+git20201124.$(shell echo $(DIMENTIO_COMMIT) | cut -c -7)
 DEB_DIMENTIO_V     ?= $(DIMENTIO_VERSION)
 
-DIMENTIO_COMMIT    := 7ffffffd95119e439669aba5b3d0af36fff5ba17
+DIMENTIO_COMMIT    := 7ffffff5f441285c457773742241df1849063fd2
 DIMENTIO_SOVERSION := 0
 DIMENTIO_LIBS      := -framework CoreFoundation -framework IOKit -lcompression
 
 dimentio-setup: setup
-	-[ ! -e "$(BUILD_SOURCE)/dimentio-v$(DIMENTIO_VERSION).tar.gz" ] \
-		&& wget -nc -O$(BUILD_SOURCE)/dimentio-v$(DIMENTIO_VERSION).tar.gz \
+	-[ ! -e "$(BUILD_SOURCE)/dimentio-v$(DIMENTIO_COMMIT).tar.gz" ] \
+		&& wget -nc -O$(BUILD_SOURCE)/dimentio-v$(DIMENTIO_COMMIT).tar.gz \
 			https://github.com/0x7ff/dimentio/archive/$(DIMENTIO_COMMIT).tar.gz
-	$(call EXTRACT_TAR,dimentio-v$(DIMENTIO_VERSION).tar.gz,dimentio-$(DIMENTIO_COMMIT),dimentio)
+	$(call EXTRACT_TAR,dimentio-v$(DIMENTIO_COMMIT).tar.gz,dimentio-$(DIMENTIO_COMMIT),dimentio)
 	mkdir -p $(BUILD_STAGE)/dimentio/usr/{bin,lib,include}
 
 ifneq ($(wildcard $(BUILD_WORK)/dimentio/.build_complete),)
@@ -22,13 +23,21 @@ dimentio:
 	@echo "Using previously built dimentio."
 else
 dimentio: dimentio-setup
+
+	###
+	# As of right now, -arch arm64e is prepended to the CFLAGS to allow for it to work properly on arm64e iPhones.
+	# Do not compile this for <= 1600 with XCode 12, and do not compile it for >= 1700 with Xcode << 12.
+	# 1.0.3+git20201124.7ffffff should be the last version (save for some emergency update) for CFVER <= 1600
+	# To make toolchain switching easier on me, I'm just going to compile this for >= 1700 from now on.
+	###
+
 	# libdimentio.o
-	$(CC) $(CFLAGS) -D__arm64e__ \
+	$(CC) -arch arm64e $(CFLAGS) \
 		-c -o $(BUILD_WORK)/dimentio/libdimentio.o -x c \
 		$(BUILD_WORK)/dimentio/libdimentio.c
 
 	# libdimentio.dylib
-	$(CC) $(CFLAGS) -dynamiclib \
+	$(CC) -arch arm64e $(CFLAGS) -dynamiclib \
 		-install_name "/usr/lib/libdimentio.$(DIMENTIO_SOVERSION).dylib" \
 		-o $(BUILD_WORK)/dimentio/libdimentio.$(DIMENTIO_SOVERSION).dylib \
 		$(BUILD_WORK)/dimentio/libdimentio.o \
@@ -40,12 +49,12 @@ dimentio: dimentio-setup
 		$(BUILD_WORK)/dimentio/libdimentio.o
 
 	# dimentio.o
-	$(CC) $(CFLAGS) \
+	$(CC) -arch arm64e $(CFLAGS) \
 		-c -o $(BUILD_WORK)/dimentio/dimentio.o -x c \
 		$(BUILD_WORK)/dimentio/dimentio.c
 
 	# dimentio
-	$(CC) $(CFLAGS) \
+	$(CC) -arch arm64e $(CFLAGS) \
 		-o $(BUILD_WORK)/dimentio/dimentio \
 		$(BUILD_WORK)/dimentio/dimentio.o \
 		$(BUILD_WORK)/dimentio/libdimentio.$(DIMENTIO_SOVERSION).dylib
